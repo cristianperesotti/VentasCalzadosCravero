@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control de Ventas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+function generarTablaEmpleado(datos, total, promedio, nombre) {
+  return `
+    <table>
+      <thead><tr><th>Fecha</th><th>Ventas</th></tr></thead>
+      <tbody>
+        ${datos.map(v => `<tr><td>${v.fecha}</td><td>${v.cantidad}</td></tr>`).join("") || '<tr><td colspan="2">Sin ventas</td></tr>'}
+      </tbody>
+    </table>
+    <p><strong>Total:</strong> ${total}</p>
+    <p><strong>Promedio Diario:</strong> ${promedio}</p>
+    <div class="acciones">
+      <button class="eliminar" onclick="borrarEmpleado('${nombre}')">Eliminar datos de ${nombre}</button>
+    </div>
+  `;
+}
+
+function filtrarEmpleado(nombre) {
+  const inicio = document.getElementById("emp-inicio").value;
+  const fin = document.getElementById("emp-fin").value;
+  const storageKey = getStorageKey();
+  const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]");
+  let datos = ventas.filter(v => v.nombre === nombre);
+  if (inicio || fin) {
+    datos = datos.filter(v => (!inicio || v.fecha >= inicio) && (!fin || v.fecha <= fin));
+  }
+  const total = datos.reduce((s, v) => s + v.cantidad, 0);
+  const dias = new Set(datos.map(v => v.fecha)).size;
+  const promedio = dias > 0 ? (total / dias).toFixed(2) : 0;
+  document.getElementById("tabla-empleado").innerHTML = generarTablaEmpleado(datos, total, promedio, nombre);
+}
+
+</script>
+
+  <style>
+    :root {
+      --color-principal: #0078ff;
+      --color-fondo: #f5f7fb;
+      --color-texto: #333;
+      --color-card: #fff;
+      --color-boton: #0078ff;
+      --color-boton-hover: #005ec7;
+      --color-excel: #28a745;
+      --color-eliminar: #dc3545;
+      --sombra: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    body {
+      margin: 0;
+      font-family: "Poppins", "Segoe UI", sans-serif;
+      background: var(--color-fondo);
+      color: var(--color-texto);
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== SIDEBAR ===== */
+    aside {
+      background: var(--color-card);
+      width: 240px;
+      min-height: 100vh;
+      border-right: 1px solid #ddd;
+      padding: 1rem;
+      box-shadow: var(--sombra);
+      position: fixed;
+      top: 0;
+      left: 0;
+      transition: all 0.3s ease;
+      z-index: 20;
+    }
+
+    aside h2 {
+      text-align: center;
+      color: var(--color-principal);
+      font-weight: 600;
+    }
+
+    aside ul {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0 0 0;
+    }
+
+    aside li {
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    aside li:hover, aside li.activo {
+      background: var(--color-principal);
+      color: #fff;
+      transform: scale(1.02);
+    }
+
+    /* ===== MAIN ===== */
+    main {
+      margin-left: 240px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      transition: margin-left 0.3s ease;
+    }
+
+    header {
+      width: 100%;
+      background: var(--color-card);
+      text-align: center;
+      padding: 1rem 0;
+      border-radius: 12px;
+      box-shadow: var(--sombra);
+      margin-bottom: 1rem;
+      animation: fadeInDown 0.5s ease;
+    }
+
+    header img {
+      width: 100px;
+      height: auto;
+      max-width: 25vw; /* máximo 25% del ancho de la ventana */
+    }
+    @media (max-width: 600px) {
+      header img {
+        width: 70px;
+      }
+    }
+
+    h1 {
+      margin: 0.5rem 0;
+      color: var(--color-principal);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Estilos para pestañas de negocios */
+    .nav-negocios {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 1rem;
+      padding: 0 1rem 1rem 1rem;
+      border-bottom: 2px solid var(--color-fondo);
+    }
+    .nav-negocios button {
+      background: #eee;
+      color: var(--color-principal);
+      border: 1px solid var(--color-principal);
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+    .nav-negocios button:hover {
+      background: #e0e0e0;
+    }
+    .nav-negocios button.activo {
+      background: var(--color-principal);
+      color: white;
+      transform: translateY(0);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* Navegación principal (Registrar, Totales, Ranking) */
+    nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    nav button {
+      background: var(--color-boton);
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: var(--sombra);
+    }
+
+    nav button:hover {
+      background: var(--color-boton-hover);
+      transform: translateY(-2px);
+    }
+
+    .container {
+      background: var(--color-card);
+      padding: 1.2rem;
+      border-radius: 12px;
+      width: 95%;
+      max-width: 900px;
+      box-shadow: var(--sombra);
+      margin-bottom: 2rem;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .seccion {
+      display: none;
+    }
+    .activo {
+      display: block !important;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(10px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+
+    @keyframes fadeInDown {
+      from {opacity: 0; transform: translateY(-15px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    /* NUNEVO: Estilos para <thead>, <tbody>, <tfoot> */
+    thead th {
+      background: var(--color-principal);
+      color: white;
+    }
+    
+    tbody tr:nth-child(even) {
+      background-color: var(--color-fondo);
+    }
+
+    tfoot tr {
+      background-color: #e9ecef;
+      font-weight: bold;
+      color: var(--color-principal);
+      border-top: 2px solid var(--color-principal);
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.6rem;
+      text-align: center;
+    }
+
+    #tabla-ranking td:first-child {
+      font-weight: bold;
+      color: var(--color-principal);
+    }
+
+    input[type="number"], input[type="date"] {
+      padding: 0.4rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      width: 100%;
+      max-width: 120px;
+      text-align: center;
+    }
+
+    .acciones {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button.exportar {
+      background: var(--color-excel);
+      color: #fff;
+    }
+    button.exportar:hover {
+      background: #1e7e34;
+    }
+
+    button.eliminar {
+      background: var(--color-eliminar);
+      color: #fff;
+    }
+    button.eliminar:hover {
+      background: #b02a37;
+    }
+
+    /* MOBILE */
+    @media (max-width: 768px) {
+      aside {
+        position: fixed;
+        left: -240px;
+      }
+      aside.activo {
+        left: 0;
+      }
+      main {
+        margin-left: 0;
+      }
+      #menuToggle {
+        display: block;
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 30;
+        background: var(--color-principal);
+        color: #fff;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        box-shadow: var(--sombra);
+      }
+    }
+
+    #menuToggle {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <button id="menuToggle" onclick="toggleMenu()">☰</button>
+
+  <aside id="sidebar">
+    <h2 id="titulo-sidebar">Empleados</h2>
+    <ul id="lista-empleados"></ul>
+  </aside>
+
+  <main>
+    <header>
+      <img src="https://res.cloudinary.com/dh1qqui2h/image/upload/v1761342826/ChatGPT_Image_24_oct_2025_06_53_33_p.m._hh6509.png" alt="Logo">
+      <h1>Control de Ventas</h1>
+      
+      <nav id="nav-negocios" class="nav-negocios"></nav>
+    </header>
+
+    <nav>
+      <button onclick="mostrarSeccion('registro')">Registrar</button>
+      <button onclick="mostrarSeccion('totales')">Totales</button>
+      <button onclick="mostrarSeccion('ranking')">🏆 Ranking</button>
+    </nav>
+
+    <div class="container">
+      <section id="registro" class="seccion activo">
+        <h2>Registrar Ventas</h2>
+        <label><strong>Fecha:</strong></label>
+        <input type="date" id="fecha-registro">
+        <table id="tabla-registro"></table>
+        <div class="acciones">
+          <button onclick="guardarVentas()">Guardar</button>
+        </div>
+      </section>
+
+      <section id="totales" class="seccion">
+        <h2>Totales de Ventas</h2>
+        <div style="display:flex; flex-wrap: wrap; gap:10px; justify-content:center; margin-bottom:10px;">
+          <div><label>Desde:</label><input type="date" id="fecha-inicio"></div>
+          <div><label>Hasta:</label><input type="date" id="fecha-fin"></div>
+          <button onclick="filtrarPorFecha()">Filtrar</button>
+        </div>
+        <table id="tabla-totales"></table>
+
+        <div class="acciones">
+          <button class="exportar" onclick="exportarExcel()">Exportar Excel</button>
+          <button class="exportar" onclick="exportarGoogleSheets()">Exportar Sheets</button>
+          <button class="eliminar" onclick="borrarTodo()">🗑️ Borrar todos los datos</button>
+        </div>
+
+        <div style="text-align:center;margin-top:1rem;">
+          <label>Eliminar registros del día:</label>
+          <input type="date" id="fecha-borrar">
+          <button class="eliminar" onclick="borrarPorFecha(document.getElementById('fecha-borrar').value)">Borrar por fecha</button>
+        </div>
+      </section>
+
+      <section id="empleado-detalle" class="seccion">
+        <h2 id="titulo-empleado"></h2>
+        <div id="detalle-empleado"></div>
+      </section>
+
+      <section id="ranking" class="seccion">
+        <h2>🏆 Ranking Global de Vendedores</h2>
+        <p style="text-align:center; font-size: 0.9rem; color: #555;">Suma de ventas de todos los locales</p>
+        
+    <div style="text-align:center; margin-bottom:10px;">
+      <label>Desde:</label>
+      <input type="date" id="ranking-inicio">
+      <label>Hasta:</label>
+      <input type="date" id="ranking-fin">
+      <button onclick="mostrarRanking()">Filtrar</button>
+    </div>
+    <table id="tabla-ranking"></table>
+    
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // --- Estructura de Negocios (Actualizada por vos) ---
+    const negocios = {
+      "BUSCAPIE COSQUIN": ["Gabriel", "Mariela", "Nidia", "Tamara", "Mauro", "Veronica", "Nuri", "Jose"],
+      "COSQUIN SPORT": ["Jose", "Nuri", "Macarena", "Mauro", "Juli Co"],
+      "APIE": ["Nidia", "Daniel"],
+      "BUSCAPIE EXPRESS": ["Lucas", "Ivan", "Ezequiel", "Veronica"]
+    };
+
+    const nombresNegocios = Object.keys(negocios);
+    let negocioActivo = nombresNegocios[0]; // Negocio por defecto
+
+    const fechaInput = document.getElementById("fecha-registro");
+    fechaInput.value = new Date().toISOString().split("T")[0];
+
+    function getStorageKey() {
+      return `ventas-${negocioActivo}`;
+  document.getElementById('tabla-empleado').innerHTML = document.getElementById('detalle-empleado').innerHTML;
+    }
+
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("activo");
+    }
+
+    function mostrarSeccion(id) {
+      document.querySelectorAll(".seccion").forEach(s => s.classList.remove("activo"));
+      document.getElementById(id).classList.add("activo");
+      if (id === "totales") mostrarTotales();
+      if (id === "ranking") mostrarRanking(); 
+    }
+
+    // --- Funciones de Negocios ---
+    function crearNavNegocios() {
+      const nav = document.getElementById("nav-negocios");
+      nav.innerHTML = "";
+      nombresNegocios.forEach(nombre => {
+        const btn = document.createElement("button");
+        btn.textContent = nombre;
+        btn.onclick = () => seleccionarNegocio(nombre);
+        if (nombre === negocioActivo) {
+          btn.classList.add("activo");
+        }
+        nav.appendChild(btn);
+      });
+    }
+
+    function seleccionarNegocio(nombre) {
+      negocioActivo = nombre;
+      crearNavNegocios();
+      actualizarUICompleta();
+    }
+
+    function actualizarUICompleta() {
+      crearMenuEmpleados();
+      crearTablaRegistro();
+      const seccionActiva = document.querySelector(".seccion.activo").id;
+      if (seccionActiva === "totales") {
+        mostrarTotales();
+      } else if (seccionActiva === "empleado-detalle") {
+        mostrarSeccion('registro');
+      } else if (seccionActiva === "ranking") {
+        mostrarRanking();
+      }
+    }
+    // --- Fin Funciones de Negocios ---
+
+    function crearTablaRegistro() {
+      const tabla = document.getElementById("tabla-registro");
+      const empleados = negocios[negocioActivo]; 
+      tabla.innerHTML = "<tr><th>Empleado</th><th>Ventas</th></tr>";
+      empleados.forEach(nombre => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td>${nombre}</td>
+          <td><input type="number" id="venta-${nombre}" min="0"></td>
+        `;
+        tabla.appendChild(fila);
+      });
+    }
+
+    function crearMenuEmpleados() {
+      const lista = document.getElementById("lista-empleados");
+      lista.innerHTML = ""; 
+      const empleados = negocios[negocioActivo]; 
+      empleados.forEach(nombre => {
+        const li = document.createElement("li");
+        li.textContent = nombre;
+        li.onclick = () => mostrarEmpleado(nombre, li);
+        lista.appendChild(li);
+      });
+    }
+
+    function mostrarEmpleado(nombre, elemento) {
+      document.querySelectorAll("aside li").forEach(li => li.classList.remove("activo"));
+      elemento.classList.add("activo");
+      document.querySelectorAll(".seccion").forEach(s => s.classList.remove("activo"));
+      document.getElementById("empleado-detalle").classList.add("activo");
+
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      const datos = ventas.filter(v => v.nombre === nombre);
+      const total = datos.reduce((sum, v) => sum + v.cantidad, 0);
+      const dias = new Set(datos.map(v => v.fecha)).size;
+      const promedio = dias > 0 ? (total / dias).toFixed(2) : 0;
+
+      document.getElementById("titulo-empleado").textContent = `Ventas de ${nombre}`;
+      document.getElementById("detalle-empleado").innerHTML = `
+        <div style="text-align:center; margin-bottom:10px;">
+          <label>Desde:</label>
+          <input type="date" id="emp-inicio">
+          <label>Hasta:</label>
+          <input type="date" id="emp-fin">
+          <button onclick="filtrarEmpleado('${nombre}')">Filtrar</button>
+        </div>
+        <div id="tabla-empleado">
+    
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Ventas</th></tr>
+          </thead>
+          <tbody>
+            ${datos.map(v => `<tr><td>${v.fecha}</td><td>${v.cantidad}</td></tr>`).join("") || '<tr><td colspan="2">Sin ventas</td></tr>'}
+          </tbody>
+        </table>
+        <p><strong>Total:</strong> ${total}</p>
+        <p><strong>Promedio Diario:</strong> ${promedio}</p>
+        <div class="acciones">
+          <button class="eliminar" onclick="borrarEmpleado('${nombre}')">Eliminar datos de ${nombre}</button>
+        </div>
+      `;
+    }
+
+    function guardarVentas() {
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      const fecha = fechaInput.value;
+      const empleados = negocios[negocioActivo]; 
+
+      empleados.forEach(nombre => {
+        const input = document.getElementById(`venta-${nombre}`);
+        const cantidad = parseInt(input.value);
+        if (!isNaN(cantidad) && cantidad > 0) { 
+          ventas.push({ nombre, fecha, cantidad });
+          input.value = "";
+        }
+      });
+      localStorage.setItem(storageKey, JSON.stringify(ventas)); 
+      alert(`Ventas de ${negocioActivo} guardadas correctamente ✅`);
+    }
+
+    function mostrarTotales() {
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      renderTotales(ventas);
+    }
+    
+    // --- NUEVA FUNCIÓN HELPER PARA OBTENER DATOS DE RESUMEN ---
+    // Esta función es usada por renderTotales, exportarExcel y exportarGoogleSheets
+    function getDatosResumen(ventas) {
+      const empleados = negocios[negocioActivo]; 
+      const resumen = [];
+
+      empleados.forEach(nombre => {
+        const datos = ventas.filter(v => v.nombre === nombre);
+        const total = datos.reduce((s, v) => s + v.cantidad, 0);
+        const dias = new Set(datos.map(v => v.fecha)).size;
+        const promedio = dias > 0 ? (total / dias).toFixed(2) : "0.00";
+        resumen.push({ 
+          "Empleado": nombre, 
+          "Total": total, 
+          "Promedio Diario": promedio 
+        });
+      });
+
+      // Calcular totales del negocio
+      const granTotalVentas = ventas.reduce((s, v) => s + v.cantidad, 0);
+      const totalDias = new Set(ventas.map(v => v.fecha)).size;
+      const promedioTotal = totalDias > 0 ? (granTotalVentas / totalDias).toFixed(2) : "0.00";
+
+      // Añadir fila de total al resumen
+      resumen.push({
+        "Empleado": "TOTAL NEGOCIO",
+        "Total": granTotalVentas,
+        "Promedio Diario": promedioTotal
+      });
+      
+      return resumen;
+    }
+
+
+    // --- MODIFICADO: Usa getDatosResumen y <thead>/<tbody>/<tfoot> ---
+    function renderTotales(ventas) {
+      const tabla = document.getElementById("tabla-totales");
+      const datosResumen = getDatosResumen(ventas);
+
+      let tbodyHTML = "";
+      // Renderizar filas de empleados
+      datosResumen.forEach((item, index) => {
+        if (index === datosResumen.length - 1) return; // Saltar la última fila (total)
+        tbodyHTML += `<tr><td>${item.Empleado}</td><td>${item.Total}</td><td>${item["Promedio Diario"]}</td></tr>`;
+      });
+      
+      if (tbodyHTML === "") {
+        tbodyHTML = '<tr><td colspan="3">No hay datos para el período seleccionado.</td></tr>';
+      }
+
+      // Obtener la fila de total
+      const totalItem = datosResumen[datosResumen.length - 1];
+
+      // Ensamblar la tabla completa
+      tabla.innerHTML = `
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Total</th>
+            <th>Promedio Diario</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tbodyHTML}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>${totalItem.Empleado}</td>
+            <td>${totalItem.Total}</td>
+            <td>${totalItem["Promedio Diario"]}</td>
+          </tr>
+        </tfoot>
+      `;
+    }
+    
+    // --- FUNCIÓN DE RANKING GLOBAL (sin cambios) ---
+    function mostrarRanking() {
+      const inicio = document.getElementById("ranking-inicio")?.value;
+      const fin = document.getElementById("ranking-fin")?.value;
+    
+      let todasLasVentas = [];
+      nombresNegocios.forEach(nombreNegocio => {
+        const storageKey = `ventas-${nombreNegocio}`;
+        const ventasNegocio = JSON.parse(localStorage.getItem(storageKey) || "[]");
+        todasLasVentas = todasLasVentas.concat(ventasNegocio);
+      });
+      const ventasAgrupadas = todasLasVentas.reduce((acc, venta) => {
+        const nombre = venta.nombre;
+        const cantidad = parseInt(venta.cantidad) || 0;
+        if (!acc[nombre]) {
+          acc[nombre] = 0;
+        }
+        acc[nombre] += cantidad;
+        return acc;
+      }, {});
+      const rankingArray = Object.keys(ventasAgrupadas).map(nombre => {
+        return { nombre: nombre, total: ventasAgrupadas[nombre] };
+      });
+      const rankingFiltrado = rankingArray.filter(item => item.total > 0);
+      rankingFiltrado.sort((a, b) => b.total - a.total); 
+      const tabla = document.getElementById("tabla-ranking");
+      tabla.innerHTML = "<thead><tr><th>#</th><th>Empleado</th><th>Total Ventas</th></tr></thead><tbody>";
+      if (rankingFiltrado.length === 0) {
+        tabla.innerHTML += '<tr><td colspan="3">Aún no hay ventas registradas.</td></tr>';
+      } else {
+        rankingFiltrado.forEach((item, index) => {
+          tabla.innerHTML += `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${item.nombre}</td>
+              <td>${item.total}</td>
+            </tr>
+          `;
+        });
+      }
+      tabla.innerHTML += "</tbody>";
+    }
+
+    function filtrarPorFecha() {
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      const inicio = document.getElementById("fecha-inicio").value;
+      const fin = document.getElementById("fecha-fin").value;
+      const filtradas = ventas.filter(v =>
+        (!inicio || v.fecha >= inicio) && (!fin || v.fecha <= fin)
+      );
+      renderTotales(filtradas);
+    }
+
+    // --- MODIFICADO: Exporta la tabla de resumen (getDatosResumen) ---
+    function exportarExcel() {
+      // 1. Obtener datos filtrados
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      const inicio = document.getElementById("fecha-inicio").value;
+      const fin = document.getElementById("fecha-fin").value;
+      const filtradas = ventas.filter(v =>
+        (!inicio || v.fecha >= inicio) && (!fin || v.fecha <= fin)
+      );
+      
+      if (filtradas.length === 0 && ventas.length === 0) return alert("No hay datos para exportar");
+
+      // 2. Usar los datos filtrados (o todos si no hay filtro)
+      const datosParaExportar = (inicio || fin) ? filtradas : ventas;
+      if (datosParaExportar.length === 0) return alert("No hay datos en el rango de fechas para exportar");
+
+      // 3. Generar el resumen
+      const datosResumen = getDatosResumen(datosParaExportar);
+
+      // 4. Convertir resumen a hoja de cálculo
+      const hoja = XLSX.utils.json_to_sheet(datosResumen);
+      
+      // 5. Añadir anchos de columna para "tabla bien ordenada"
+      hoja["!cols"] = [
+          { wch: 20 }, // Empleado
+          { wch: 10 }, // Total
+          { wch: 15 }  // Promedio Diario
+      ];
+
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, hoja, `Resumen ${negocioActivo}`);
+      
+      const fechaFiltro = inicio || fin ? `_${inicio}_a_${fin}` : "_completo";
+      XLSX.writeFile(libro, `resumen_ventas_${negocioActivo}${fechaFiltro}.xlsx`);
+    }
+
+    // --- MODIFICADO: Exporta la tabla de resumen (getDatosResumen) como CSV ---
+    function exportarGoogleSheets() {
+      // 1. Obtener datos filtrados
+      const storageKey = getStorageKey(); 
+      const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+      const inicio = document.getElementById("fecha-inicio").value;
+      const fin = document.getElementById("fecha-fin").value;
+      const filtradas = ventas.filter(v =>
+        (!inicio || v.fecha >= inicio) && (!fin || v.fecha <= fin)
+      );
+
+      if (filtradas.length === 0 && ventas.length === 0) return alert("No hay datos para exportar");
+
+      // 2. Usar los datos filtrados (o todos si no hay filtro)
+      const datosParaExportar = (inicio || fin) ? filtradas : ventas;
+      if (datosParaExportar.length === 0) return alert("No hay datos en el rango de fechas para exportar");
+      
+      // 3. Generar el resumen
+      const datosResumen = getDatosResumen(datosParaExportar);
+
+      // 4. Convertir resumen a CSV
+      const headers = Object.keys(datosResumen[0]).join(",");
+      const rows = datosResumen.map(item => 
+        // Envolver cada valor en comillas para manejar comas o espacios
+        `"${item.Empleado}","${item.Total}","${item["Promedio Diario"]}"`
+      ).join("\n");
+      
+      const csv = "data:text/csv;charset=utf-8," + [headers, rows].join("\n");
+      
+      const encodedUri = encodeURI(csv);
+      window.open(encodedUri);
+    }
+
+    // --- Funciones de Borrado (sin cambios) ---
+    function borrarTodo() {
+      if (confirm(`¿Seguro que quieres borrar TODOS los registros de ${negocioActivo}?`)) { 
+        const storageKey = getStorageKey(); 
+        localStorage.removeItem(storageKey); 
+        alert(`Todos los datos de ${negocioActivo} fueron eliminados.`); 
+        mostrarTotales();
+      }
+    }
+
+    function borrarEmpleado(nombre) {
+      if (confirm(`¿Eliminar todas las ventas de ${nombre} en ${negocioActivo}?`)) { 
+        const storageKey = getStorageKey(); 
+        let ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+        ventas = ventas.filter(v => v.nombre !== nombre);
+        localStorage.setItem(storageKey, JSON.stringify(ventas)); 
+        alert(`Se eliminaron los registros de ${nombre}.`);
+        mostrarEmpleado(nombre, document.querySelector(`aside li.activo`));
+      }
+    }
+
+    function borrarPorFecha(fecha) {
+      if (!fecha) return alert("Selecciona una fecha primero.");
+      if (confirm(`¿Eliminar todos los registros de ${negocioActivo} del ${fecha}?`)) { 
+        const storageKey = getStorageKey(); 
+        let ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
+        ventas = ventas.filter(v => v.fecha !== fecha);
+        localStorage.setItem(storageKey, JSON.stringify(ventas)); 
+        alert(`Registros del ${fecha} eliminados.`);
+        mostrarTotales();
+      }
+    }
+
+    // --- INICIALIZACIÓN DE LA APP ---
+    crearNavNegocios();
+    actualizarUICompleta();
+    
+  
+function generarTablaEmpleado(datos, total, promedio, nombre) {
+  return `
+    <table>
+      <thead><tr><th>Fecha</th><th>Ventas</th></tr></thead>
+      <tbody>
+        ${datos.map(v => `<tr><td>${v.fecha}</td><td>${v.cantidad}</td></tr>`).join("") || '<tr><td colspan="2">Sin ventas</td></tr>'}
+      </tbody>
+    </table>
+    <p><strong>Total:</strong> ${total}</p>
+    <p><strong>Promedio Diario:</strong> ${promedio}</p>
+    <div class="acciones">
+      <button class="eliminar" onclick="borrarEmpleado('${nombre}')">Eliminar datos de ${nombre}</button>
+    </div>
+  `;
+}
+
+function filtrarEmpleado(nombre) {
+  const inicio = document.getElementById("emp-inicio").value;
+  const fin = document.getElementById("emp-fin").value;
+  const storageKey = getStorageKey();
+  const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]");
+  let datos = ventas.filter(v => v.nombre === nombre);
+  if (inicio || fin) {
+    datos = datos.filter(v => (!inicio || v.fecha >= inicio) && (!fin || v.fecha <= fin));
+  }
+  const total = datos.reduce((s, v) => s + v.cantidad, 0);
+  const dias = new Set(datos.map(v => v.fecha)).size;
+  const promedio = dias > 0 ? (total / dias).toFixed(2) : 0;
+  document.getElementById("tabla-empleado").innerHTML = generarTablaEmpleado(datos, total, promedio, nombre);
+}
+
+</script>
+</body>
+</html>
