@@ -337,7 +337,7 @@ function filtrarEmpleado(nombre) {
 
   <main>
     <header>
-      <img src="https://res.cloudinary.com/dh1qqui2h/image/upload/v1761426211/cc_iutvce.jpg" alt="Logo">
+      <img src="https://res.cloudinary.com/dh1qqui2h/image/upload/v1761342826/ChatGPT_Image_24_oct_2025_06_53_33_p.m._hh6509.png" alt="Logo">
       <h1>Control de Ventas</h1>
       
       <nav id="nav-negocios" class="nav-negocios"></nav>
@@ -538,23 +538,74 @@ function filtrarEmpleado(nombre) {
     }
 
     function guardarVentas() {
+      // ---- PEGA AQUÍ LA URL DE TU APLICACIÓN WEB DE APPS SCRIPT ----
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx2lp_SwuPjbyMurTgDg4niw5YsXqYumAPkE4LXGyqjZshvG9MOKTWoVaCWyZG7_Bymmg/exec";
+
       const storageKey = getStorageKey(); 
       const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
       const fecha = fechaInput.value;
       const empleados = negocios[negocioActivo]; 
+      
+      let ventasGuardadas = 0; // Contador para la alerta
+      let promesasDeEnvio = []; // Array para todas las solicitudes fetch
 
       empleados.forEach(nombre => {
         const input = document.getElementById(`venta-${nombre}`);
         const cantidad = parseInt(input.value);
-        if (!isNaN(cantidad) && cantidad > 0) { 
-          ventas.push({ nombre, fecha, cantidad });
+        
+        if (!isNaN(cantidad) && cantidad > 0) {
+          const venta = { nombre, fecha, cantidad };
+          
+          // 1. Guardar en localStorage (como antes)
+          ventas.push(venta);
           input.value = "";
+          ventasGuardadas++;
+
+          // 2. Preparar el envío a Google Sheets
+          const datosParaSheet = {
+            negocio: negocioActivo, // Añadimos el negocio activo
+            fecha: fecha,
+            nombre: nombre,
+            cantidad: cantidad
+          };
+
+          // 3. Crear la promesa de envío
+          const promesa = fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Importante para evitar errores de CORS con Apps Script
+            cache: 'no-cache',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            redirect: 'follow',
+            body: JSON.stringify(datosParaSheet)
+          }).catch(err => console.error(`Error al enviar a ${nombre}:`, err)); // Captura errores
+          
+          promesasDeEnvio.push(promesa);
         }
       });
+      
+      // Guardar todo en localStorage al final
       localStorage.setItem(storageKey, JSON.stringify(ventas)); 
-      alert(`Ventas de ${negocioActivo} guardadas correctamente ✅`);
+      
+      if (ventasGuardadas > 0) {
+        alert(`Ventas de ${negocioActivo} guardadas localmente ✅`);
+        
+        // Informar cuando todos los envíos se completen
+        Promise.all(promesasDeEnvio)
+          .then(responses => {
+            console.log("Todos los datos enviados a Google Sheets.");
+            // Opcional: mostrar otra alerta, pero "no-cors" no nos da respuesta
+          })
+          .catch(error => {
+            console.error("Error en algún envío a Google Sheets:", error);
+            alert("Error al sincronizar con Google Sheets. Los datos están guardados localmente.");
+          });
+          
+      } else {
+        alert("No se ingresaron ventas nuevas.");
+      }
     }
-
     function mostrarTotales() {
       const storageKey = getStorageKey(); 
       const ventas = JSON.parse(localStorage.getItem(storageKey) || "[]"); 
